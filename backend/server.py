@@ -346,6 +346,24 @@ async def delete_category(cid: str, _: dict = Depends(require_admin)):
 
 
 # ------------------------------------------------------------------ items
+async def build_ref_maps():
+    whs = await db.warehouses.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(2000)
+    brs = await db.brands.find({}, {"_id": 0, "id": 1, "name": 1, "color": 1}).to_list(2000)
+    cats = await db.categories.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(2000)
+    return ({w["id"]: w for w in whs}, {b["id"]: b for b in brs}, {c["id"]: c for c in cats})
+
+
+def enrich_with_maps(item, wmap, bmap, cmap):
+    w = wmap.get(item.get("warehouse_id"))
+    b = bmap.get(item.get("brand_id"))
+    c = cmap.get(item.get("category_id"))
+    item["warehouse_name"] = w["name"] if w else None
+    item["brand_name"] = b["name"] if b else None
+    item["brand_color"] = b["color"] if b else None
+    item["category_name"] = c["name"] if c else None
+    return item
+
+
 async def enrich_item(item: dict) -> dict:
     wh = await db.warehouses.find_one({"id": item.get("warehouse_id")}, {"_id": 0, "name": 1})
     br = await db.brands.find_one({"id": item.get("brand_id")}, {"_id": 0, "name": 1, "color": 1})
@@ -675,9 +693,12 @@ async def create_penerimaan(body: PenerimaanIn, user: dict = Depends(get_current
 # ------------------------------------------------------------------ dashboard
 @api.get("/dashboard")
 async def dashboard(_: dict = Depends(get_current_user)):
-    items = await db.items.find({}, {"_id": 0}).to_list(5000)
-    total_units = sum(i.get("total_qty", 0) for i in items)
+    items = await db.items.find(
+        {},
+        {"_id": 0, "total_qty": 1, "available_qty": 1, "damaged_qty": 1, "lost_qty": 1, "used_qty": 1},
+    ).to_list(5000)
     available = sum(i.get("available_qty", 0) for i in items)
+    total_units = sum(i.get("total_qty", 0) for i in items)
     damaged = sum(i.get("damaged_qty", 0) for i in items)
     lost = sum(i.get("lost_qty", 0) for i in items)
     used = sum(i.get("used_qty", 0) for i in items)
@@ -705,8 +726,9 @@ async def dashboard(_: dict = Depends(get_current_user)):
 @api.get("/export/inventory.xlsx")
 async def export_inventory(_: dict = Depends(require_admin)):
     items = await db.items.find({}, {"_id": 0}).to_list(5000)
+    wmap, bmap, cmap = await build_ref_maps()
     for it in items:
-        await enrich_item(it)
+        enrich_with_maps(it, wmap, bmap, cmap)
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Inventori"
