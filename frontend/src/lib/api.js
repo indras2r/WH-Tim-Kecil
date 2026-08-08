@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+// Point the web app at the SHARED backend (same as the Expo mobile app).
+// Swap REACT_APP_API_URL in frontend/.env to the production URL later.
+const BACKEND_URL = process.env.REACT_APP_API_URL || process.env.REACT_APP_BACKEND_URL;
 export const API = `${BACKEND_URL}/api`;
 
 export const api = axios.create({ baseURL: API });
