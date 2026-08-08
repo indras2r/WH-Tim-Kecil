@@ -1,0 +1,27 @@
+{
+  "summary": "Bug-fix verification for 'blank white screen after login' on the per-environment backend (https://stock-tracker-2199.preview.emergentagent.com). RESULT: BUG IS FIXED. Admin login lands on a fully-rendered Dashboard (no blank page, no ErrorBoundary fallback). All 10 KPI cards render with numeric values: kpi-total_items=12, kpi-units_available=976, kpi-units_out=1, kpi-total_units=977, kpi-warehouses=2, kpi-units_damaged=1, kpi-units_lost=1, kpi-units_used=2, kpi-sj_active=0, kpi-sj_returned=1. 'Surat Jalan Terbaru' section renders 1 entry (SJ-202608-0001, Selesai) — not empty and not crashed — proving the schema-tolerant norm.recent = recent_sj ?? recent_surat_jalan ?? [] guard works. error-reload-btn is NOT present (ErrorBoundary not triggered). Regression checks all pass: Inventory shows 12 rows with colored brand dots + brand name + jenis + gudang; admin sees add-item-btn and export-xlsx-btn. Surat Jalan tab-aktif and tab-selesai both present and clickable. Penerimaan page shows create-penerimaan-btn. Master Data sidebar links (gudang/brand/jenis/pengguna) visible for admin. Staff login: KPI cards still render (dashboard fix confirmed for staff too), and Master Data links + add-item-btn + export-xlsx-btn are correctly hidden.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SuratJalanCreate form", "issues": ["Native browser date input still used (mm/dd/yyyy) instead of shadcn Calendar Popover — cosmetic only, unchanged from prior iterations."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_3.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Dashboard.jsx norm object correctly tolerates both English (v3.0) and Indonesian schema keys and guards recent_sj/recent_surat_jalan with ?? []. This is the exact fix needed for the reported blank-screen crash.",
+    "ErrorBoundary is wired in App.js and would surface error-reload-btn if a render still crashed — verified NOT triggered in this run.",
+    "api.js uses REACT_APP_API_URL || REACT_APP_BACKEND_URL, currently resolved to the per-env backend at stock-tracker-2199, which is online and serving data.",
+    "Sidebar testids remain Indonesian-derived (sidebar-inventori-link, sidebar-surat-jalan-link, sidebar-gudang-link, etc.). Consider making testids i18n-independent for stability."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only run per request)", "frontend": "100% of verification points passed"},
+  "test_credentials": "Admin: admin@eventgudang.com / admin123 | Staff: staff@eventgudang.com / staff123",
+  "seed_data_creation": "None. Did not create new SJ/Penerimaan/Items in this run (dashboard already showed 1 pre-existing TEST_ SJ and 1 TEST_NewItem — likely from prior iteration).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Bug fix verified on the per-env backend stock-tracker-2199. Dashboard data returned by this backend uses Indonesian keys mapped correctly via norm{} in Dashboard.jsx. Sidebar link testids: sidebar-inventori-link, sidebar-surat-jalan-link, sidebar-penerimaan-link, sidebar-gudang-link, sidebar-brand-link, sidebar-jenis-link, sidebar-pengguna-link. There is NO /profile route (console warning); profile is a sidebar entry — clarify or add route if needed. Logout button testid not confirmed — used localStorage.clear fallback for staff login switch.",
+  "rca of the issue": "Original bug: dashboard crashed on d.recent_sj.length when backend returned recent_surat_jalan (Indonesian schema), causing blank-white-screen. FIX (verified): (1) Dashboard.jsx normalises both schemas via nullish coalescing on every KPI key and recent list; (2) ErrorBoundary wraps routes as a safety net; (3) api base uses REACT_APP_BACKEND_URL to point at a live per-env backend. All three verified working."
+}
