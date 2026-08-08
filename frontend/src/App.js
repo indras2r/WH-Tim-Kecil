@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/context/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -29,6 +30,7 @@ const app = (el, admin) => (
 function App() {
   return (
     <AuthProvider>
+      <ErrorBoundary>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
@@ -48,6 +50,7 @@ function App() {
           <Route path="/profil" element={app(<Profile />)} />
         </Routes>
       </BrowserRouter>
+      </ErrorBoundary>
       <Toaster position="top-right" richColors />
     </AuthProvider>
   );

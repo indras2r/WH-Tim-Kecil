@@ -39,6 +39,24 @@ export default function Dashboard() {
     api.get("/dashboard").then((r) => setD(r.data)).catch((e) => toast.error(apiError(e)));
   }, []);
 
+  // Tolerate both backend schemas (shared v3.0 English keys and the deployed
+  // backend's Indonesian keys) so the dashboard never crashes on a missing key.
+  const norm = d
+    ? {
+        total_items: d.total_items ?? d.jenis_barang ?? 0,
+        units_available: d.units_available ?? d.tersedia ?? 0,
+        units_out: d.units_out ?? d.keluar ?? 0,
+        total_units: d.total_units ?? d.total_unit ?? 0,
+        warehouses: d.warehouses ?? d.gudang ?? 0,
+        units_damaged: d.units_damaged ?? d.rusak ?? 0,
+        units_lost: d.units_lost ?? d.hilang ?? 0,
+        units_used: d.units_used ?? d.terpakai ?? 0,
+        sj_active: d.sj_active ?? d.sj_aktif ?? 0,
+        sj_returned: d.sj_returned ?? d.sj_selesai ?? 0,
+        recent: d.recent_sj ?? d.recent_surat_jalan ?? [],
+      }
+    : null;
+
   return (
     <div>
       <PageTitle title="Dashboard" subtitle="Ringkasan inventori & aktivitas gudang">
@@ -70,7 +88,7 @@ export default function Dashboard() {
               <Icon className={`w-4 h-4 ${tone}`} strokeWidth={1.75} />
             </div>
             <div className="font-display text-3xl font-bold text-gray-900 mt-3 font-mono">
-              {d ? d[key] ?? 0 : "—"}
+              {norm ? norm[key] ?? 0 : "—"}
             </div>
           </div>
         ))}
@@ -85,14 +103,14 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="divide-y divide-gray-100">
-            {!d ? (
+            {!norm ? (
               <div className="p-6 text-sm text-gray-400">Memuat…</div>
-            ) : d.recent_sj.length === 0 ? (
+            ) : norm.recent.length === 0 ? (
               <div className="p-6">
                 <Empty title="Belum ada surat jalan" hint="Buat surat jalan pertama Anda" />
               </div>
             ) : (
-              d.recent_sj.map((sj) => (
+              norm.recent.map((sj) => (
                 <Link
                   key={sj.id}
                   to={`/surat-jalan/${sj.id}`}
