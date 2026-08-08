@@ -1,0 +1,170 @@
+{
+  "theme": {
+    "mode": "light",
+    "archetype": "Swiss & High-Contrast (Authority, Clarity, Truth)"
+  },
+  "typography": {
+    "headings": {
+      "family": "Cabinet Grotesk",
+      "fallback": "ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "style": "tracking-tight",
+      "weights": ["font-medium", "font-bold", "font-black"]
+    },
+    "body": {
+      "family": "IBM Plex Sans",
+      "fallback": "ui-sans-serif, system-ui, -apple-system, sans-serif",
+      "style": "tracking-normal",
+      "weights": ["font-normal", "font-medium"]
+    },
+    "monospace": {
+      "family": "IBM Plex Mono",
+      "usage": "SKUs, QR Codes, Data Tables, Inventory Quantities"
+    },
+    "rules": [
+      "NO Inter, Roboto, or Open Sans for headings.",
+      "Headings (H1) max text-4xl to text-5xl on desktop, tight letter spacing.",
+      "Overlines/Labels MUST be uppercase, tiny, wide spacing (tracking-[0.2em]).",
+      "Hierarchy Gap Rule: Ensure contrast in font size between title and subtitle."
+    ]
+  },
+  "colors": {
+    "background": {
+      "primary": "#F9F9FB",
+      "secondary": "#FFFFFF",
+      "surface": "#FFFFFF"
+    },
+    "text": {
+      "primary": "#111827",
+      "secondary": "#4B5563",
+      "tertiary": "#6B7280"
+    },
+    "brand": {
+      "primary": "#002FA7",
+      "primary_hover": "#00227A",
+      "primary_foreground": "#FFFFFF"
+    },
+    "accents": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "danger": "#EF4444"
+    },
+    "brand_palette": [
+      "#EF4444", "#F97316", "#F59E0B", "#84CC16", "#10B981",
+      "#06B6D4", "#3B82F6", "#6366F1", "#8B5CF6", "#D946EF", "#F43F5E"
+    ],
+    "rules": [
+      "Borders must be high contrast (e.g., border-gray-200 or border-gray-300) to expose the skeleton.",
+      "FORBIDDEN COLOR: teal green or teal blue (#1B93A4).",
+      "Never use pure black or pure grey. Tint greys with subtle cool blue/purple.",
+      "High contrast for all text to meet APCA standards. ALWAYS explicitly set text color on hover."
+    ]
+  },
+  "surfaces_and_borders": {
+    "style": "Grid Borders (The Technical Look)",
+    "border_radius": "rounded-sm (2px max for slight softening) or cardless",
+    "shadows": "Minimal to none. Rely on 1px solid borders for definition rather than soft shadows.",
+    "rules": [
+      "DO NOT use transparent backgrounds for headers/dropdowns. Always solid white or heavy glassmorphism with 1px inner stroke.",
+      "Dashboard cards: Flat background, 1px subtle border, no shadow by default. On hover: slight lift, subtle shadow.",
+      "Containers with border must have padding on text content to avoid collision."
+    ]
+  },
+  "layouts_and_spacing": {
+    "strategy": "The Bento Grid Protocol (High Density)",
+    "spacing_scale": "p-1, p-2, p-4, p-6, p-8, p-12",
+    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 with tight gaps (gap-4 or gap-6).",
+    "rules": [
+      "Mobile-first responsive layout.",
+      "Sidebar layout: fixed left sidebar (w-64 on desktop, collapsible), main content area on the right.",
+      "Direct Children Only for grids. Do not wrap grid items in random divs.",
+      "Left-align tabular data, forms, and paragraphs for better readability."
+    ]
+  },
+  "motion": {
+    "hover_states": "Crisp transitions. Border color darkens, slight lift (-translate-y-1) for interactive cards.",
+    "rules": [
+      "Do NOT use 'transition: all'. Apply specific transitions (e.g., transition-colors, transition-transform).",
+      "Use sonner for toast notifications (top-right placement)."
+    ]
+  },
+  "components": {
+    "navigation": {
+      "type": "Sidebar",
+      "behavior": "Collapsible on desktop.",
+      "content": "Dashboard, Inventori, Surat Jalan, Penerimaan, Master Data (Warehouses, Brands, Categories), Profil"
+    },
+    "data_table": {
+      "features": "Photo thumbnails (zoom in tight on product), brand colored dots/chips, robust filtering (warehouse, brand, category), search, export to Excel button.",
+      "style": "Dense tabular layout, sticky header, compact rows, 1px solid borders between rows."
+    },
+    "kpi_cards": {
+      "style": "Metric-focused, top-left priority. Show Jenis Barang, Tersedia, Keluar, Total Unit, Gudang, Rusak, Hilang, Terpakai, SJ Aktif, SJ Selesai."
+    },
+    "surat_jalan": {
+      "features": "Tabs for Aktif / Selesai. Detail view with on-screen QR code. Print to PDF. Return flow with states (Baik/Rusak/Hilang/Terpakai)."
+    },
+    "master_data": {
+      "features": "CRUD for Warehouses, Brands, Categories. Brand requires a COLOR PICKER using the 11-color brand_palette."
+    }
+  },
+  "accessibility": {
+    "rules": [
+      "All interactive elements MUST include a `data-testid` attribute (e.g., data-testid='sidebar-inventory-link').",
+      "Focus states must have higher contrast (e.g., focus:ring-2 focus:ring-brand/50).",
+      "Animations should respect prefers-reduced-motion."
+    ]
+  },
+  "media": {
+    "icons": {
+      "library": "lucide-react",
+      "style": "Stroke width 1.5, precise and industrial."
+    },
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1774988353278-b01caf489c4e",
+        "category": "inventory_item_lighting",
+        "description": "Stage lights illuminate a dark venue with warm glow (Use for Lighting Category thumbnails)"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1763560595910-0141a43e06ef",
+        "category": "inventory_item_spotlight",
+        "description": "Spotlight on a tripod (Use for Lighting Category thumbnails)"
+      },
+      {
+        "url": "https://images.pexels.com/photos/16466795/pexels-photo-16466795.jpeg",
+        "category": "inventory_item_audio_mixer",
+        "description": "Detailed view of colorful dials on an audio mixing console (Use for Sound Category thumbnails)"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1644079446600-219068676743",
+        "category": "warehouse_background",
+        "description": "Large warehouse filled with lots of shelves (Use for login background or empty states)"
+      }
+    ],
+    "rules": [
+      "NEVER use placeholder URLs. Use provided images for product thumbnails or avatars.",
+      "Zoom in: Use close-ups for item thumbnails to create intimacy."
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Initialize Shadcn UI and customize component borders to be sharp (rounded-sm) and colors to map to the strict industrial Swiss archetype.",
+    "Build a robust sidebar navigation layout (EventGudang) with a sticky header containing user avatar, page title, and search.",
+    "Implement the Dashboard with modular KPI cards arranged in a dense grid (Bento/High Density pattern).",
+    "For the inventory table, use Shadcn Table. Incorporate the provided thumbnail images and use the brand_palette for colored dots/chips.",
+    "Implement the 11-color palette picker in Master Data -> Brands.",
+    "Use react-qr-code or similar for the Surat Jalan detail view.",
+    "For PDF printing, setup a printable area using CSS media queries (@media print) or react-to-print.",
+    "Add 'data-testid' to ALL interactive elements (forms, buttons, inputs, links).",
+    "Ensure all copy is in Indonesian (e.g., Jenis Barang, Tersedia, Keluar, Rusak, Hilang, Penerimaan, Surat Jalan)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic outputs. Break the mold: use industrial precision, high-contrast borders, and clear typographic hierarchy.",
+    "DO NOT use generic centered layouts. Left-align data and forms for readability.",
+    "NEVER use 'transition: all'. Use specific CSS transitions.",
+    "DO NOT use transparent backgrounds on overlays/dropdowns. Ensure a solid background.",
+    "Use 2-3x more spacing for structural layout between sections, but keep data tables and dashboards dense and scannable.",
+    "Use sonner for toasts at top-right.",
+    "Ensure strict adherence to the provided colors and fonts. Do not invent new shades.",
+    "Do not use AI assistant Emoji characters (like 🤖, 💡, etc)."
+  ]
+}
