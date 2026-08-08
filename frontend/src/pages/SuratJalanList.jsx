@@ -17,8 +17,11 @@ export default function SuratJalanList() {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/surat-jalan?status_filter=${tab}`);
-      setRows(data);
+      const { data } = await api.get(`/surat-jalan`);
+      const rows = data.filter((sj) =>
+        tab === "aktif" ? sj.status === "out" || sj.status === "partial" : sj.status === "returned"
+      );
+      setRows(rows);
     } catch (e) {
       toast.error(apiError(e));
     } finally {

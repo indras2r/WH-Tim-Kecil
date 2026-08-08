@@ -19,16 +19,16 @@ import { toast } from "sonner";
 import { PageTitle, StatusBadge, Empty } from "@/components/common";
 
 const KPIS = [
-  { key: "jenis_barang", label: "Jenis Barang", icon: Package, tone: "text-brand" },
-  { key: "tersedia", label: "Tersedia", icon: CheckCircle2, tone: "text-emerald-600" },
-  { key: "keluar", label: "Keluar", icon: Truck, tone: "text-amber-600" },
-  { key: "total_unit", label: "Total Unit", icon: Boxes, tone: "text-gray-700" },
-  { key: "gudang", label: "Gudang", icon: Warehouse, tone: "text-brand" },
-  { key: "rusak", label: "Rusak", icon: AlertTriangle, tone: "text-orange-600" },
-  { key: "hilang", label: "Hilang", icon: Ban, tone: "text-red-600" },
-  { key: "terpakai", label: "Terpakai", icon: Recycle, tone: "text-violet-600" },
-  { key: "sj_aktif", label: "SJ Aktif", icon: FileText, tone: "text-blue-600" },
-  { key: "sj_selesai", label: "SJ Selesai", icon: CheckCircle2, tone: "text-emerald-600" },
+  { key: "total_items", label: "Jenis Barang", icon: Package, tone: "text-brand" },
+  { key: "units_available", label: "Tersedia", icon: CheckCircle2, tone: "text-emerald-600" },
+  { key: "units_out", label: "Keluar", icon: Truck, tone: "text-amber-600" },
+  { key: "total_units", label: "Total Unit", icon: Boxes, tone: "text-gray-700" },
+  { key: "warehouses", label: "Gudang", icon: Warehouse, tone: "text-brand" },
+  { key: "units_damaged", label: "Rusak", icon: AlertTriangle, tone: "text-orange-600" },
+  { key: "units_lost", label: "Hilang", icon: Ban, tone: "text-red-600" },
+  { key: "units_used", label: "Terpakai", icon: Recycle, tone: "text-violet-600" },
+  { key: "sj_active", label: "SJ Aktif", icon: FileText, tone: "text-blue-600" },
+  { key: "sj_returned", label: "SJ Selesai", icon: CheckCircle2, tone: "text-emerald-600" },
 ];
 
 export default function Dashboard() {
@@ -87,12 +87,12 @@ export default function Dashboard() {
           <div className="divide-y divide-gray-100">
             {!d ? (
               <div className="p-6 text-sm text-gray-400">Memuat…</div>
-            ) : d.recent_surat_jalan.length === 0 ? (
+            ) : d.recent_sj.length === 0 ? (
               <div className="p-6">
                 <Empty title="Belum ada surat jalan" hint="Buat surat jalan pertama Anda" />
               </div>
             ) : (
-              d.recent_surat_jalan.map((sj) => (
+              d.recent_sj.map((sj) => (
                 <Link
                   key={sj.id}
                   to={`/surat-jalan/${sj.id}`}

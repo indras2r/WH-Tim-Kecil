@@ -36,7 +36,17 @@ export default function Inventory() {
         api.get("/brands"),
         api.get("/categories"),
       ]);
-      setItems(i.data);
+      const brandMap = Object.fromEntries(b.data.map((x) => [x.id, x]));
+      const whMap = Object.fromEntries(w.data.map((x) => [x.id, x]));
+      const catMap = Object.fromEntries(c.data.map((x) => [x.id, x]));
+      const enriched = i.data.map((it) => ({
+        ...it,
+        brand_name: brandMap[it.brand_id]?.name || null,
+        brand_color: brandMap[it.brand_id]?.color || null,
+        category_name: catMap[it.category_id]?.name || null,
+        warehouse_name: whMap[it.warehouse_id]?.name || null,
+      }));
+      setItems(enriched);
       setWarehouses(w.data);
       setBrands(b.data);
       setCategories(c.data);

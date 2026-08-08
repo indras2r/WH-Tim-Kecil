@@ -1,0 +1,32 @@
+{
+  "summary": "Bug-fix verification run: frontend was repointed to the SHARED live backend (https://inventory-event-gear.preview.emergentagent.com) and adapted to its v3.0 schema (un-enriched items, English dashboard keys, client-side SJ status filter). All verification points PASS. Login works, dashboard KPIs (total_items=11, units_available=928, units_out=6, total_units=941, warehouses=2, units_damaged=7, units_lost=3, units_used=13, sj_active=3, sj_returned=11) populate from shared backend. Recent SJ list renders 5 entries with correct Aktif/Selesai badges. Inventory shows all 11 items with CLIENT-SIDE ENRICHED brand color dots (hex->rgb), brand names, category names, warehouse names — despite backend returning un-enriched items. Filter chips (Gudang/Brand/Jenis) render with colored brand dots. Admin sees Add/Edit/Delete/Export controls + Master Data section (Gudang, Brand, Jenis, Pengguna). Staff correctly hides all of those (0 edit buttons, 0 delete buttons, add/export/master links all False). SJ list Aktif tab = 3 rows (out/partial), Selesai tab = 11 rows (returned) — client-side filter working. SJ create page loads warehouse-scoped item list with brand color dots + qty +/- controls. Master data pages (warehouses/brands/categories/users) all load with add buttons. Penerimaan list shows 4 receipts each with 1 BARU badge. Profile page shows role + logout.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "SuratJalanCreate form", "issues": ["Native browser date input (mm/dd/yyyy) used instead of shadcn Calendar Popover — same finding as iteration_1, still not addressed. Cosmetic only."]}
+    ],
+    "testid_gaps": [
+      {"screen": "SuratJalanCreate", "issue": "Form field data-testids from spec are missing: sj-warehouse-select, sj-recipient-input, sj-event-input, sj-date-input. Only sj-submit exists. Fields render and are usable but automation selectors from the spec don't match.", "priority": "LOW"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_2.json"],
+  "action_items": [
+    "OPTIONAL: Add missing data-testids on SuratJalanCreate form fields (sj-warehouse-select, sj-recipient-input, sj-event-input, sj-date-input) to match the spec and enable full E2E automation of SJ creation.",
+    "OPTIONAL: Replace native date input with shadcn Calendar Popover for design consistency."
+  ],
+  "critical_code_review_comments": [
+    "Dashboard/Inventory client-side enrichment (join brands/warehouses/categories maps in Inventory.jsx load()) works correctly against the un-enriched shared backend — verified via visible rows.",
+    "SuratJalanList client-side filter of status (out|partial -> Aktif, returned -> Selesai) verified: 3 Aktif + 11 Selesai matches KPI counts.",
+    "Sidebar testids are derived from label.toLowerCase() (e.g. sidebar-inventori-link, sidebar-gudang-link) which does not match the spec-mentioned English names (sidebar-inventory-link, sidebar-warehouses-link). This is a spec vs. code mismatch — code uses Indonesian labels so testids are Indonesian. Consider stabilising testids independent of visible label to keep automation stable across i18n changes."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (shared external backend, not tested per instruction)", "frontend": "100% of the verification points in the review request"},
+  "test_credentials": "Admin: admin@eventgudang.com / admin123 | Staff: staff@eventgudang.com / staff123 (against shared backend)",
+  "seed_data_creation": "None. No new SJ/Penerimaan/Items created this run to keep shared backend clean.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Frontend now consumes the SHARED backend at https://inventory-event-gear.preview.emergentagent.com. REACT_APP_API_URL controls this. Sidebar link testids are Indonesian-label derived: sidebar-inventori-link, sidebar-surat-jalan-link, sidebar-penerimaan-link, sidebar-gudang-link, sidebar-brand-link, sidebar-jenis-link, sidebar-pengguna-link. Item rows: item-row-{id}. Inventory brand dots are inline <span style=background-color:...> (hex converted to rgb by browser). Dashboard KPI testids kpi-{key} where key is the shared-backend English name. SJ Aktif/Selesai are client-side filtered — do NOT expect status_filter query param to work on the shared backend for those values.",
+  "rca of the issue": "N/A — bug-fix verified successful. The original bug (frontend pointing at old local backend after schema drift) is resolved by (1) REACT_APP_API_URL repoint, (2) Dashboard KPI key remap to English keys, (3) client-side enrichment in Inventory/ItemDetail/SuratJalanCreate joining brand/warehouse/category maps, (4) client-side SJ status filter (out|partial=Aktif, returned=Selesai)."
+}

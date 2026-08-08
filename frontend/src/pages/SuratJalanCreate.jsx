@@ -9,6 +9,7 @@ export default function SuratJalanCreate() {
   const navigate = useNavigate();
   const [warehouses, setWarehouses] = useState([]);
   const [items, setItems] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [wh, setWh] = useState("");
   const [form, setForm] = useState({ recipient_name: "", event_name: "", event_date: "", notes: "" });
   const [qty, setQty] = useState({});
@@ -20,12 +21,16 @@ export default function SuratJalanCreate() {
       setWarehouses(r.data);
       if (r.data[0]) setWh(r.data[0].id);
     });
+    api.get("/brands").then((r) => setBrands(r.data));
   }, []);
   useEffect(() => {
     if (!wh) return;
     setQty({});
-    api.get(`/items?warehouse_id=${wh}`).then((r) => setItems(r.data));
-  }, [wh]);
+    api.get(`/items?warehouse_id=${wh}`).then((r) => {
+      const bmap = Object.fromEntries(brands.map((x) => [x.id, x]));
+      setItems(r.data.map((it) => ({ ...it, brand_name: bmap[it.brand_id]?.name || null, brand_color: bmap[it.brand_id]?.color || null })));
+    });
+  }, [wh, brands]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setItemQty = (id, delta, max) =>

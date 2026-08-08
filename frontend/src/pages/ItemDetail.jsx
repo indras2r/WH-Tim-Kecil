@@ -32,7 +32,16 @@ export default function ItemDetail() {
         api.get("/brands"),
         api.get("/categories"),
       ]);
-      setItem(it.data);
+      const brand = b.data.find((x) => x.id === it.data.brand_id);
+      const wh = w.data.find((x) => x.id === it.data.warehouse_id);
+      const cat = c.data.find((x) => x.id === it.data.category_id);
+      setItem({
+        ...it.data,
+        brand_name: brand?.name || null,
+        brand_color: brand?.color || null,
+        category_name: cat?.name || null,
+        warehouse_name: wh?.name || null,
+      });
       setRefs({ warehouses: w.data, brands: b.data, categories: c.data });
     } catch (e) {
       toast.error(apiError(e));
