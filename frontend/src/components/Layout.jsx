@@ -70,12 +70,15 @@ function NavItem({ item, collapsed, onClick }) {
 function SidebarContent({ collapsed, onNavClick, isAdmin }) {
   return (
     <div className="flex flex-col h-full">
-      <div className={cn("h-16 flex items-center border-b border-gray-200 px-5", collapsed && "justify-center px-0")}>
-        {collapsed ? (
-          <span className="font-display font-black text-brand text-xl">EG</span>
-        ) : (
-          <span className="font-display font-black text-xl text-gray-900">
-            Event<span className="text-brand">Gudang</span>
+      <div className={cn("h-16 flex items-center gap-2.5 border-b border-gray-200 px-4", collapsed && "justify-center px-0 gap-0")}>
+        <img
+          src={`${process.env.PUBLIC_URL}/company-logo.webp`}
+          alt="Tim Kecil Inventory Control"
+          className="w-9 h-9 object-contain shrink-0"
+        />
+        {!collapsed && (
+          <span className="font-display font-bold text-[15px] leading-tight text-gray-900">
+            Tim Kecil<br />Inventory Control
           </span>
         )}
       </div>
