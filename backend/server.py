@@ -14,6 +14,7 @@ from typing import List, Optional, Literal
 from datetime import datetime, timezone
 import uuid
 import io
+import asyncio
 import logging
 import jwt
 import bcrypt
@@ -22,7 +23,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 
 # ------------------------------------------------------------------ DB
 mongo_url = os.environ["MONGO_URL"]
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=8000, connectTimeoutMS=8000)
 db = client[os.environ["DB_NAME"]]
 
 JWT_SECRET = os.environ["JWT_SECRET"]
@@ -42,6 +43,11 @@ def now_iso() -> str:
 
 def new_id() -> str:
     return str(uuid.uuid4())
+
+
+def user_pwd(u: dict) -> str:
+    # Tolerate both field names (this DB may be shared with the mobile app).
+    return u.get("hashed_password") or u.get("password_hash") or ""
 
 
 def hash_password(password: str) -> str:
@@ -77,9 +83,13 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Sesi berakhir, silakan masuk kembali")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token tidak valid")
-    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "hashed_password": 0})
+    user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "hashed_password": 0, "password_hash": 0})
     if not user or not user.get("is_active", True):
         raise HTTPException(status_code=401, detail="Pengguna tidak ditemukan")
+    user.setdefault("created_at", "")
+    user.setdefault("is_active", True)
+    if not user.get("full_name"):
+        user["full_name"] = user.get("name", user.get("email", ""))
     return user
 
 
@@ -197,7 +207,7 @@ class PenerimaanIn(BaseModel):
 async def login(body: LoginIn):
     email = body.email.lower()
     user = await db.users.find_one({"email": email})
-    if not user or not verify_password(body.password, user["hashed_password"]):
+    if not user or not verify_password(body.password, user_pwd(user)):
         raise HTTPException(status_code=401, detail="Email atau kata sandi salah")
     if not user.get("is_active", True):
         raise HTTPException(status_code=403, detail="Akun dinonaktifkan")
@@ -208,10 +218,10 @@ async def login(body: LoginIn):
         "user": {
             "id": user["id"],
             "email": user["email"],
-            "full_name": user["full_name"],
-            "role": user["role"],
+            "full_name": user.get("full_name", user.get("name", "")),
+            "role": user.get("role", "staff"),
             "is_active": user.get("is_active", True),
-            "created_at": user["created_at"],
+            "created_at": user.get("created_at", ""),
         },
     }
 
@@ -787,7 +797,11 @@ SEED_WAREHOUSES = [("Gudang Pusat", "Jl. Industri No. 1, Jakarta"), ("Gudang Ban
 
 
 async def seed():
-    # users
+    # Idempotent: never drop, modify, or reseed when the database already has
+    # data (this DB is shared with the mobile app). Only seed an EMPTY database.
+    if await db.users.count_documents({}) > 0 or await db.items.count_documents({}) > 0:
+        logger.info("Existing data detected — skipping seed (idempotent).")
+        return
     for email_key, pw_key, name, role in [
         ("ADMIN_EMAIL", "ADMIN_PASSWORD", "Administrator", "admin"),
         ("STAFF_EMAIL", "STAFF_PASSWORD", "Staff Gudang", "staff"),
@@ -796,18 +810,12 @@ async def seed():
         pw = os.environ.get(pw_key, "")
         if not email or not pw:
             continue
-        existing = await db.users.find_one({"email": email})
-        if not existing:
+        if not await db.users.find_one({"email": email}):
             await db.users.insert_one({
                 "id": new_id(), "email": email, "full_name": name,
                 "hashed_password": hash_password(pw), "role": role,
                 "is_active": True, "created_at": now_iso(),
             })
-        elif not verify_password(pw, existing["hashed_password"]):
-            await db.users.update_one({"email": email}, {"$set": {"hashed_password": hash_password(pw)}})
-
-    if await db.items.count_documents({}) > 0:
-        return  # data already seeded
 
     wh_ids = {}
     for name, addr in SEED_WAREHOUSES:
@@ -850,15 +858,27 @@ async def seed():
     logger.info("Seed data inserted")
 
 
+async def _db_init():
+    try:
+        await db.users.create_index("email", unique=True)
+        await db.warehouses.create_index("name", unique=True)
+        await db.brands.create_index("name", unique=True)
+        await db.categories.create_index("name", unique=True)
+        await db.items.create_index("sku", unique=True)
+        await db.surat_jalan.create_index("qr_token")
+    except Exception as e:
+        logger.warning(f"Index init skipped: {e}")
+    try:
+        await seed()
+    except Exception as e:
+        logger.error(f"Seed skipped (DB unreachable?): {e}")
+
+
 @app.on_event("startup")
 async def on_startup():
-    await db.users.create_index("email", unique=True)
-    await db.warehouses.create_index("name", unique=True)
-    await db.brands.create_index("name", unique=True)
-    await db.categories.create_index("name", unique=True)
-    await db.items.create_index("sku", unique=True)
-    await db.surat_jalan.create_index("qr_token")
-    await seed()
+    # Run DB init in the background so the server starts serving immediately
+    # even if the (shared/remote) DB is briefly unreachable.
+    asyncio.create_task(_db_init())
 
 
 @app.on_event("shutdown")
