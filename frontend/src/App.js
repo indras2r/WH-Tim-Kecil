@@ -1,55 +1,55 @@
-import { useEffect } from "react";
-import "@/App.css";
+import "@/index.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Layout from "@/components/Layout";
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import Inventory from "@/pages/Inventory";
+import ItemDetail from "@/pages/ItemDetail";
+import SuratJalanList from "@/pages/SuratJalanList";
+import SuratJalanCreate from "@/pages/SuratJalanCreate";
+import SuratJalanDetail from "@/pages/SuratJalanDetail";
+import PenerimaanList from "@/pages/PenerimaanList";
+import PenerimaanCreate from "@/pages/PenerimaanCreate";
+import PenerimaanDetail from "@/pages/PenerimaanDetail";
+import Warehouses from "@/pages/master/Warehouses";
+import Brands from "@/pages/master/Brands";
+import Categories from "@/pages/master/Categories";
+import UsersPage from "@/pages/master/Users";
+import Profile from "@/pages/Profile";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+const app = (el, admin) => (
+  <ProtectedRoute adminOnly={admin}>
+    <Layout>{el}</Layout>
+  </ProtectedRoute>
+);
 
 function App() {
   return (
-    <div className="App">
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={app(<Dashboard />)} />
+          <Route path="/inventori" element={app(<Inventory />)} />
+          <Route path="/inventori/:id" element={app(<ItemDetail />)} />
+          <Route path="/surat-jalan" element={app(<SuratJalanList />)} />
+          <Route path="/surat-jalan/baru" element={app(<SuratJalanCreate />)} />
+          <Route path="/surat-jalan/:id" element={app(<SuratJalanDetail />)} />
+          <Route path="/penerimaan" element={app(<PenerimaanList />)} />
+          <Route path="/penerimaan/baru" element={app(<PenerimaanCreate />)} />
+          <Route path="/penerimaan/:id" element={app(<PenerimaanDetail />)} />
+          <Route path="/master/warehouses" element={app(<Warehouses />, true)} />
+          <Route path="/master/brands" element={app(<Brands />, true)} />
+          <Route path="/master/categories" element={app(<Categories />, true)} />
+          <Route path="/master/users" element={app(<UsersPage />, true)} />
+          <Route path="/profil" element={app(<Profile />)} />
         </Routes>
       </BrowserRouter>
-    </div>
+      <Toaster position="top-right" richColors />
+    </AuthProvider>
   );
 }
 
