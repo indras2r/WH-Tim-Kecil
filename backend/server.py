@@ -390,8 +390,9 @@ async def list_items(
     if category_id:
         q["category_id"] = category_id
     items = await db.items.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    wmap, bmap, cmap = await build_ref_maps()
     for it in items:
-        await enrich_item(it)
+        enrich_with_maps(it, wmap, bmap, cmap)
     return items
 
 
