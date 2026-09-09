@@ -23,6 +23,7 @@ export default function SuratJalanCreate() {
     });
     api.get("/brands").then((r) => setBrands(r.data));
   }, []);
+
   useEffect(() => {
     if (!wh) return;
     setQty({});
@@ -33,11 +34,18 @@ export default function SuratJalanCreate() {
   }, [wh, brands]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  
   const setItemQty = (id, delta, max) =>
     setQty((s) => {
       const next = Math.max(0, Math.min(max, (s[id] || 0) + delta));
       return { ...s, [id]: next };
     });
+
+  const handleManualQty = (id, value, max) => {
+    const parsed = parseInt(value, 10);
+    const validQty = isNaN(parsed) ? 0 : Math.max(0, Math.min(max, parsed));
+    setQty((s) => ({ ...s, [id]: validQty }));
+  };
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -135,7 +143,7 @@ export default function SuratJalanCreate() {
                       <span>· Tersedia {it.available_qty}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <button
                       data-testid={`sj-minus-${it.id}`}
                       onClick={() => setItemQty(it.id, -1, it.available_qty)}
@@ -144,7 +152,15 @@ export default function SuratJalanCreate() {
                     >
                       <Minus className="w-4 h-4" />
                     </button>
-                    <span className="w-10 text-center font-mono font-semibold" data-testid={`sj-qty-${it.id}`}>{qty[it.id] || 0}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max={it.available_qty}
+                      data-testid={`sj-qty-${it.id}`}
+                      value={qty[it.id] ?? 0}
+                      onChange={(e) => handleManualQty(it.id, e.target.value, it.available_qty)}
+                      className="w-14 h-8 text-center font-mono font-semibold border border-gray-300 rounded-sm focus:outline-none focus:ring-1 focus:ring-brand [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm"
+                    />
                     <button
                       data-testid={`sj-plus-${it.id}`}
                       onClick={() => setItemQty(it.id, 1, it.available_qty)}
