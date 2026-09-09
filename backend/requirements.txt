@@ -3,6 +3,7 @@ uvicorn
 pymongo
 motor
 python-jose[cryptography]
+PyJWT
 passlib[bcrypt]
 pydantic
 python-dotenv
