@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Upload, X } from "lucide-react";
+import imageCompression from "browser-image-compression";
 import { api, apiError } from "@/lib/api";
 import {
   Dialog,
@@ -15,6 +16,7 @@ export default function ItemFormDialog({ open, onOpenChange, item, warehouses, b
   const editing = !!item;
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [compressing, setCompressing] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -37,16 +39,29 @@ export default function ItemFormDialog({ open, onOpenChange, item, warehouses, b
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const onPhoto = (e) => {
+  const onPhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 500 * 1024) {
-      toast.error("Ukuran foto maksimal 500KB");
-      return;
+
+    setCompressing(true);
+    const options = {
+      maxSizeMB: 0.1,         // Kompresi otomatis ke target ~100KB
+      maxWidthOrHeight: 1024, // Resolusi ideal untuk foto katalog barang
+      useWebWorker: true,
+    };
+
+    try {
+      const compressedFile = await imageCompression(file, options);
+      const reader = new FileReader();
+      reader.onload = () => {
+        set("photo", reader.result);
+        setCompressing(false);
+      };
+      reader.readAsDataURL(compressedFile);
+    } catch (err) {
+      toast.error("Gagal memproses gambar");
+      setCompressing(false);
     }
-    const reader = new FileReader();
-    reader.onload = () => set("photo", reader.result);
-    reader.readAsDataURL(file);
   };
 
   const submit = async () => {
@@ -97,8 +112,9 @@ export default function ItemFormDialog({ open, onOpenChange, item, warehouses, b
                 data-testid="item-photo-input"
                 className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-sm border border-gray-300 hover:border-gray-400"
               >
-                <Upload className="w-4 h-4" /> Unggah Foto
-                <input type="file" accept="image/*" className="hidden" onChange={onPhoto} />
+                {compressing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} 
+                {compressing ? "Mengompresi..." : "Unggah Foto"}
+                <input type="file" accept="image/*" className="hidden" onChange={onPhoto} disabled={compressing} />
               </label>
               {form.photo && (
                 <button onClick={() => set("photo", null)} className="p-2 text-gray-400 hover:text-red-600">
@@ -181,7 +197,7 @@ export default function ItemFormDialog({ open, onOpenChange, item, warehouses, b
           <button
             data-testid="item-save-btn"
             onClick={submit}
-            disabled={saving}
+            disabled={saving || compressing}
             className="px-4 py-2 text-sm rounded-sm bg-brand hover:bg-brand-hover text-white font-medium inline-flex items-center gap-2 disabled:opacity-60"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />} Simpan
