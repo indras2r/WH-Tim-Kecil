@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Literal
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import uuid
 import io
 import asyncio
@@ -19,7 +20,7 @@ import logging
 import jwt
 import bcrypt
 import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 # ------------------------------------------------------------------ DB
 mongo_url = os.environ["MONGO_URL"]
@@ -412,6 +413,197 @@ async def get_item(item_id: str, _: dict = Depends(get_current_user)):
     if not item:
         raise HTTPException(status_code=404, detail="Barang tidak ditemukan")
     return await enrich_item(item)
+
+
+
+@api.get("/items/{item_id}/movements")
+async def get_item_movements(item_id: str, _: dict = Depends(get_current_user)):
+    """Read-only history derived from existing receipt and delivery records.
+
+    Important: original item creation, manual quantity edits and changes without
+    corresponding documents are not reconstructable from legacy data.
+    """
+    item = await db.items.find_one({"id": item_id}, {"_id": 0, "id": 1})
+    if not item:
+        raise HTTPException(status_code=404, detail="Barang tidak ditemukan")
+
+    result = []
+    receipts = db.penerimaan.find({"items.item_id": item_id}, {"_id": 0})
+    async for doc in receipts:
+        for line in doc.get("items", []):
+            if line.get("item_id") != item_id:
+                continue
+            qty = line.get("qty", 0)
+            result.append({
+                "id": f"pbk:{doc['id']}:{item_id}", "type": "IN", "qty": qty,
+                "date": doc.get("created_at"), "document_number": doc.get("receipt_number"),
+                "document_id": doc.get("id"), "document_type": "penerimaan",
+                "event_name": None, "party": doc.get("supplier_name"),
+                "actor": doc.get("created_by_name"), "note": doc.get("notes") or "",
+                "description": "Penerimaan barang" if not line.get("is_new") else "Penerimaan barang baru",
+            })
+
+    deliveries = db.surat_jalan.find({"items.item_id": item_id}, {"_id": 0})
+    async for doc in deliveries:
+        for line in doc.get("items", []):
+            if line.get("item_id") != item_id:
+                continue
+            base = {
+                "date": doc.get("created_at"), "document_number": doc.get("sj_number"),
+                "document_id": doc.get("id"), "document_type": "surat-jalan",
+                "event_name": doc.get("event_name"), "party": doc.get("recipient_name"),
+                "actor": doc.get("created_by_name"), "note": doc.get("notes") or "",
+            }
+            if line.get("qty", 0):
+                result.append({**base, "id": f"sj:{doc['id']}:{item_id}:out",
+                               "type": "OUT", "qty": -line["qty"], "description": "Barang keluar"})
+            # Existing schema stores cumulative return quantities only.
+            # returned_at is set at full closure, NOT at each partial return.
+            # Do not misrepresent it as the actual timestamp of a partial return.
+            return_groups = [
+                ("returned_qty", "RETURN", "Kembali tersedia", 1),
+                ("damaged_qty", "DAMAGED", "Dikembalikan rusak", 0),
+                ("lost_qty", "LOST", "Barang hilang", 0),
+                ("used_qty", "USED", "Barang terpakai", 0),
+            ]
+            for key, kind, label, sign in return_groups:
+                qty = line.get(key, 0)
+                if qty:
+                    result.append({**base,
+                        "id": f"sj:{doc['id']}:{item_id}:{key}",
+                        "type": kind, "qty": qty if sign else 0,
+                        "processed_qty": qty, "description": label,
+                        "date": None,
+                        "date_note": "Tanggal mutasi tidak tercatat secara individual dalam data lama",
+                    })
+    result.sort(key=lambda r: (r["date"] or "", r["id"]), reverse=True)
+    return {"item_id": item_id, "movements": result,
+            "complete": False,
+            "notice": "Riwayat berasal dari dokumen Penerimaan dan Surat Jalan. Edit stok manual, stok awal, dan waktu setiap retur parsial pada data lama belum tercatat sebagai transaksi tersendiri. Saldo historis tidak dapat dihitung dengan akurat dari data ini."}
+
+
+# ------------------------------------------------------------------ item movement Excel export
+
+def filter_item_movements(movements: list, movement_type: str = "ALL", search: str = "") -> list:
+    """Keep Excel rows consistent with the filters shown on Item Detail."""
+    kind = (movement_type or "ALL").strip().upper()
+    term = (search or "").strip().casefold()
+    return [m for m in movements if
+        (kind == "ALL" or m.get("type") == kind) and
+        (not term or term in " ".join(str(m.get(k) or "") for k in
+            ("description", "document_number", "event_name", "party", "actor", "note")
+        ).casefold())
+    ]
+
+
+def excel_safe(value):
+    """Prevent user-entered spreadsheet formulas from being evaluated."""
+    if value is None:
+        return ""
+    raw = str(value)
+    if raw.lstrip().startswith(("=", "+", "-", "@")) or raw.startswith(("\t", "\r", "\n")):
+        return "'" + raw
+    return raw
+
+
+def format_movement_date(value):
+    if not value:
+        return "Tidak tercatat"
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00")) if isinstance(value, str) else value
+        if parsed.tzinfo is None:
+            # Legacy timestamp had no timezone; avoid pretending it is WIB.
+            return parsed.strftime("%d/%m/%Y %H:%M") + " (zona waktu tidak diketahui)"
+        return parsed.astimezone(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y %H:%M WIB")
+    except (ValueError, TypeError):
+        return excel_safe(value)
+
+
+@api.get("/items/{item_id}/movements.xlsx")
+async def export_item_movements_xlsx(
+    item_id: str,
+    movement_type: str = Query("ALL", pattern="^(ALL|IN|OUT|RETURN|DAMAGED|LOST|USED)$"),
+    search: str = Query("", max_length=200),
+    user: dict = Depends(get_current_user),
+):
+    """Export visible movement history; read-only, requires a logged-in user."""
+    item = await db.items.find_one({"id": item_id}, {"_id": 0, "id": 1, "name": 1, "sku": 1})
+    if not item:
+        raise HTTPException(status_code=404, detail="Barang tidak ditemukan")
+    history = await get_item_movements(item_id, user)
+    rows = filter_item_movements(history["movements"], movement_type, search)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Riwayat Mutasi"
+    ws.sheet_view.showGridLines = False
+    ws.merge_cells("A1:J1")
+    ws["A1"] = "RIWAYAT MUTASI INVENTORI — WH TIM KECIL"
+    ws["A1"].font = Font(name="Calibri", size=15, bold=True, color="FFFFFF")
+    ws["A1"].fill = PatternFill("solid", fgColor="002FA7")
+    ws["A1"].alignment = Alignment(vertical="center")
+    ws.row_dimensions[1].height = 34
+
+    for row_n, label, value in [
+        (2, "Nama barang", item.get("name", "")),
+        (3, "SKU", item.get("sku", "")),
+        (4, "Filter jenis", movement_type if movement_type != "ALL" else "Semua mutasi"),
+        (5, "Pencarian", search or "Semua dokumen/event/petugas"),
+        (6, "Jumlah transaksi", len(rows)),
+    ]:
+        ws.cell(row_n, 1, label).font = Font(bold=True, color="334155")
+        ws.cell(row_n, 2, excel_safe(value) if not isinstance(value, int) else value)
+
+    ws.merge_cells("A8:J8")
+    ws["A8"] = "Catatan: " + history["notice"]
+    ws["A8"].alignment = Alignment(wrap_text=True, vertical="center")
+    ws["A8"].font = Font(color="92400E", size=10)
+    ws["A8"].fill = PatternFill("solid", fgColor="FFFBEB")
+    ws.row_dimensions[8].height = 46
+
+    headers = ["Tanggal", "Jenis mutasi", "Perubahan stok", "Jumlah diproses", "Nomor dokumen", "Event", "Pihak", "Petugas", "Catatan", "Informasi tanggal"]
+    for col, label in enumerate(headers, 1):
+        cell = ws.cell(10, col, label)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill("solid", fgColor="002FA7")
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
+    ws.row_dimensions[10].height = 29
+
+    for row_n, m in enumerate(rows, 11):
+        data = [
+            format_movement_date(m.get("date")),
+            m.get("description", ""),
+            m.get("qty", 0),
+            m.get("processed_qty", abs(m.get("qty", 0))),
+            m.get("document_number", ""),
+            m.get("event_name", ""),
+            m.get("party", ""),
+            m.get("actor", ""),
+            m.get("note", ""),
+            m.get("date_note", ""),
+        ]
+        for col, val in enumerate(data, 1):
+            cell = ws.cell(row_n, col, val if isinstance(val, (int, float)) else excel_safe(val))
+            cell.alignment = Alignment(vertical="top", wrap_text=(col in (6, 7, 9, 10)))
+            if row_n % 2 == 0:
+                cell.fill = PatternFill("solid", fgColor="F5F8FC")
+        ws.cell(row_n, 3).number_format = '+#,##0;-#,##0;0'
+        ws.cell(row_n, 4).number_format = '#,##0'
+        ws.row_dimensions[row_n].height = 24
+
+    for i, width in enumerate([24, 26, 17, 17, 24, 30, 25, 23, 40, 42], 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
+    ws.freeze_panes = "A11"
+    ws.auto_filter.ref = f"A10:J{max(10, len(rows) + 10)}"
+
+    buff = io.BytesIO()
+    wb.save(buff)
+    buff.seek(0)
+    safe_sku = "".join(ch for ch in str(item.get("sku") or item_id) if ch.isalnum() or ch in "-_" )[:60] or "item"
+    filename = f"riwayat-mutasi-{safe_sku}-{datetime.now(timezone.utc):%Y%m%d}.xlsx"
+    return StreamingResponse(buff, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f'attachment; filename="{filename}"',
+                                      "Cache-Control": "no-store"})
 
 
 @api.post("/items")
