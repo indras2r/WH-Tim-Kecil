@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Package, History, Download, Search } from "lucide-react";
 import { api, apiError } from "@/lib/api";
+import { readLegacyHistory, legacyHistoryNotice, legacyExcel } from "@/lib/legacyMovementHistory";
 import { BrandDot } from "@/components/common";
 import ItemFormDialog from "@/components/ItemFormDialog";
 import { useAuth } from "@/context/AuthContext";
@@ -30,6 +31,7 @@ export default function ItemDetail() {
   const [movementType, setMovementType] = useState("ALL");
   const [movementSearch, setMovementSearch] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [legacyFallback, setLegacyFallback] = useState(false);
 
   const load = async () => {
     try {
@@ -59,13 +61,41 @@ export default function ItemDetail() {
     let active = true;
     setMovementLoading(true);
     setMovementError("");
-    api.get(`/items/${id}/movements`).then(({ data }) => {
-      if (active) {
-        setMovements(data.movements || []);
-        setMovementNotice(data.notice || "");
+    setMovements([]);
+    setMovementNotice("");
+    setLegacyFallback(false);
+    const fetchHistory = async () => {
+      try {
+        const { data } = await api.get(`/items/${id}/movements`);
+        if (active) {
+          setMovements(data.movements || []);
+          setMovementNotice(data.notice || "");
+        }
+      } catch (error) {
+        // During Vercel preview the production Render backend does not yet
+        // have /items/{id}/movements. Read its existing document endpoints.
+        if (error.response?.status !== 404) {
+          if (active) setMovementError(apiError(error));
+          return;
+        }
+        try {
+          const [receipts, deliveries] = await Promise.all([
+            api.get("/penerimaan"),
+            api.get("/surat-jalan"),
+          ]);
+          if (active) {
+            setMovements(readLegacyHistory(id, receipts.data, deliveries.data));
+            setMovementNotice(legacyHistoryNotice);
+            setLegacyFallback(true);
+          }
+        } catch (fallbackError) {
+          if (active) setMovementError(apiError(fallbackError));
+        }
+      } finally {
+        if (active) setMovementLoading(false);
       }
-    }).catch((e) => { if (active) setMovementError(apiError(e)); })
-      .finally(() => { if (active) setMovementLoading(false); });
+    };
+    fetchHistory();
     return () => { active = false; };
   }, [id]);
 
@@ -80,11 +110,19 @@ export default function ItemDetail() {
     if (exporting || movementLoading || movementError || !filteredMovements.length) return;
     setExporting(true);
     try {
-      const response = await api.get(`/items/${id}/movements.xlsx`, {
-        params: { movement_type: movementType, search: movementSearch.trim() },
-        responseType: "blob",
-      });
-      const url = URL.createObjectURL(response.data);
+      let blob;
+      if (legacyFallback) {
+        // The production Render backend currently lacks the Excel endpoint.
+        // Generate the same filtered history locally, without changing stock.
+        blob = legacyExcel(item, filteredMovements, movementType, movementSearch.trim(), movementNotice);
+      } else {
+        const response = await api.get(`/items/${id}/movements.xlsx`, {
+          params: { movement_type: movementType, search: movementSearch.trim() },
+          responseType: "blob",
+        });
+        blob = response.data;
+      }
+      const url = URL.createObjectURL(blob);
       const filename = `riwayat-mutasi-${(item?.sku || "item").replace(/[^a-zA-Z0-9_-]/g, "-")}.xlsx`;
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -95,7 +133,7 @@ export default function ItemDetail() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(`${filteredMovements.length} transaksi diekspor ke Excel`);
     } catch (error) {
-      toast.error("Export Excel gagal. Periksa koneksi atau endpoint backend.");
+      toast.error("Export Excel gagal. Silakan coba lagi.");
     } finally {
       setExporting(false);
     }
@@ -206,7 +244,7 @@ export default function ItemDetail() {
         {movementNotice && <p className="mt-2 text-xs text-amber-700 bg-amber-50 p-3 rounded-sm">{movementNotice}</p>}
         {movementLoading ? <p className="mt-4 text-sm text-gray-500">Memuat histori…</p> :
           movementError ? <p className="mt-4 text-sm text-red-600">{movementError}</p> :
-          movements.length === 0 ? <p className="mt-4 text-sm text-gray-500">Belum ada dokumen transaksi untuk barang ini.</p> :
+          movements.length === 0 ? <p className="mt-4 text-sm text-gray-500">Belum ada dokumen Penerimaan atau Surat Jalan yang mencatat mutasi barang ini. Stok yang tertera pada master inventory tidak otomatis memiliki histori transaksi lama.</p> :
           filteredMovements.length === 0 ? <p className="mt-4 text-sm text-gray-500">Tidak ada transaksi sesuai filter.</p> :
           <div className="overflow-x-auto mt-4">
             <table className="min-w-full text-sm text-left">
